@@ -2,9 +2,18 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import hashlib
-from supabase import Client, create_client
+from supabase.client import create_client
 import os
 from dotenv import load_dotenv
+
+# 載入環境變數
+load_dotenv()
+
+# 設定 Supabase
+supabase = create_client(
+    os.getenv("SUPABASE_URL"),
+    os.getenv("SUPABASE_KEY")
+)
 
 # 設定頁面
 st.set_page_config(
@@ -25,27 +34,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 初始化資料庫
-def init_db():
-    conn = sqlite3.connect('inventory.db')
-    c = conn.cursor()
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        username TEXT PRIMARY KEY,
-        password TEXT NOT NULL,
-        role TEXT NOT NULL
-    )''')
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS inventory (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        product_name TEXT NOT NULL,
-        quantity INTEGER NOT NULL,
-        price REAL NOT NULL,
-        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )''')
-    conn.commit()
-    return conn
-
 # 主程式
 def main():
     st.title("🏪 店鋪庫存管理系統")
@@ -63,15 +51,12 @@ def main():
             username = st.text_input("帳號")
             password = st.text_input("密碼", type="password")
             if st.button("登入"):
-                conn = init_db()
-                c = conn.cursor()
                 hashed_pwd = hashlib.sha256(password.encode()).hexdigest()
-                c.execute("SELECT role FROM users WHERE username=? AND password=?", 
-                         (username, hashed_pwd))
-                result = c.fetchone()
-                conn.close()
                 
-                if result:
+                # 查詢使用者
+                result = supabase.table('users').select("*").eq('username', username).eq('password', hashed_pwd).execute()
+                
+                if result.data:
                     st.session_state.logged_in = True
                     st.session_state.username = username
                     st.success("登入成功！")
@@ -92,18 +77,17 @@ def main():
                 elif new_password != confirm_password:
                     st.error("密碼不一致")
                 else:
-                    conn = init_db()
+                    hashed_pwd = hashlib.sha256(new_password.encode()).hexdigest()
                     try:
-                        c = conn.cursor()
-                        hashed_pwd = hashlib.sha256(new_password.encode()).hexdigest()
-                        c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                                (new_username, hashed_pwd, "管理員"))
-                        conn.commit()
+                        # 新增使用者
+                        supabase.table('users').insert({
+                            "username": new_username,
+                            "password": hashed_pwd,
+                            "role": "管理員"
+                        }).execute()
                         st.success("註冊成功！請返回登入頁面")
-                    except sqlite3.IntegrityError:
+                    except Exception as e:
                         st.error("此帳號已存在")
-                    finally:
-                        conn.close()
     
     # 主要功能介面
     else:
@@ -125,6 +109,7 @@ def main():
         
         if st.button("新增"):
             try:
+                # 新增商品
                 supabase.table('inventory').insert({
                     "product_name": product_name,
                     "quantity": quantity,

@@ -1,5 +1,4 @@
 streamlit
 pandas
 python-dotenv
-supabase==2.3.4
-postgrest==0.13.1
+supabase-py
