@@ -98,25 +98,42 @@ def main():
                 # Debug: 顯示加密後的密碼
                 st.write("Debug: Hashed Password", hashed_pwd)
                 
-                # 直接使用 httpx 發送請求
-                url = f"{SUPABASE_URL}/rest/v1/users"
+                # 使用 SQL 查詢
+                url = f"{SUPABASE_URL}/rest/v1/rpc/check_login"
                 headers = HEADERS.copy()
-                headers["Range"] = "0-9"
                 
-                # 構建查詢參數
-                params = {
-                    "select": "*",
-                    "username": f"eq.{username}",
-                    "password": f"eq.{hashed_pwd}"
+                # 構建 SQL 查詢
+                data = {
+                    "username_input": username,
+                    "password_input": hashed_pwd
                 }
                 
                 # Debug
                 st.write("Debug: Final URL", url)
-                st.write("Debug: Params", params)
+                st.write("Debug: Data", data)
                 
                 try:
                     with httpx.Client() as client:
-                        response = client.get(url, headers=headers, params=params)
+                        # 先創建函數
+                        create_function_url = f"{SUPABASE_URL}/rest/v1/rpc/create_check_login"
+                        create_function_data = {
+                            "sql": """
+                            CREATE OR REPLACE FUNCTION check_login(username_input text, password_input text)
+                            RETURNS TABLE (username text, role text) AS $$
+                            BEGIN
+                                RETURN QUERY
+                                SELECT users.username, users.role
+                                FROM users
+                                WHERE users.username = username_input
+                                AND users.password = password_input;
+                            END;
+                            $$ LANGUAGE plpgsql;
+                            """
+                        }
+                        client.post(create_function_url, headers=headers, json=create_function_data)
+                        
+                        # 執行查詢
+                        response = client.post(url, headers=headers, json=data)
                         st.write("Debug: Response Status", response.status_code)
                         st.write("Debug: Response Text", response.text)
                         
