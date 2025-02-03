@@ -139,6 +139,10 @@ def main():
         try:
             # 讀取庫存
             result = supabase.table('inventory').select("*").execute()
+            
+            # 加入測試訊息
+            st.write("Debug: 資料讀取結果", result.data)
+            
             if result.data:
                 df = pd.DataFrame(result.data)
                 # 計算總金額
