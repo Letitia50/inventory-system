@@ -2,18 +2,33 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import hashlib
-from supabase.client import create_client
+import httpx
 import os
 from dotenv import load_dotenv
+import json
 
 # 載入環境變數
 load_dotenv()
 
-# 設定 Supabase
-supabase = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_KEY")
-)
+# Supabase API 設定
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=minimal"
+}
+
+# Supabase API 函數
+def supabase_query(table, method="GET", data=None):
+    url = f"{SUPABASE_URL}/rest/v1/{table}"
+    with httpx.Client() as client:
+        if method == "GET":
+            response = client.get(url, headers=HEADERS)
+        elif method == "POST":
+            response = client.post(url, headers=HEADERS, json=data)
+        return response.json() if response.text else []
 
 # 設定頁面
 st.set_page_config(
@@ -54,9 +69,9 @@ def main():
                 hashed_pwd = hashlib.sha256(password.encode()).hexdigest()
                 
                 # 查詢使用者
-                result = supabase.table('users').select("*").eq('username', username).eq('password', hashed_pwd).execute()
+                result = supabase_query('users', method="GET", data={"username": username, "password": hashed_pwd})
                 
-                if result.data:
+                if result:
                     st.session_state.logged_in = True
                     st.session_state.username = username
                     st.success("登入成功！")
@@ -80,11 +95,7 @@ def main():
                     hashed_pwd = hashlib.sha256(new_password.encode()).hexdigest()
                     try:
                         # 新增使用者
-                        supabase.table('users').insert({
-                            "username": new_username,
-                            "password": hashed_pwd,
-                            "role": "管理員"
-                        }).execute()
+                        supabase_query('users', method="POST", data={"username": new_username, "password": hashed_pwd, "role": "管理員"})
                         st.success("註冊成功！請返回登入頁面")
                     except Exception as e:
                         st.error("此帳號已存在")
@@ -110,12 +121,7 @@ def main():
         if st.button("新增"):
             try:
                 # 新增商品
-                supabase.table('inventory').insert({
-                    "product_name": product_name,
-                    "quantity": quantity,
-                    "price": price,
-                    "last_updated": datetime.now().isoformat()
-                }).execute()
+                supabase_query('inventory', method="POST", data={"product_name": product_name, "quantity": quantity, "price": price, "last_updated": datetime.now().isoformat()})
                 st.success("商品新增成功！")
             except Exception as e:
                 st.error(f"新增失敗：{str(e)}")
@@ -124,13 +130,13 @@ def main():
         st.header("庫存列表")
         try:
             # 讀取庫存
-            result = supabase.table('inventory').select("*").execute()
+            result = supabase_query('inventory', method="GET")
             
             # 加入測試訊息
-            st.write("Debug: 資料讀取結果", result.data)
+            st.write("Debug: 資料讀取結果", result)
             
-            if result.data:
-                df = pd.DataFrame(result.data)
+            if result:
+                df = pd.DataFrame(result)
                 # 計算總金額
                 df['總金額'] = df['quantity'] * df['price']
                 
