@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import hashlib
-from supabase import create_client
+from supabase import Client, create_client
 import os
 from dotenv import load_dotenv
 
