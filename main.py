@@ -90,50 +90,31 @@ def main():
         
         # 登入頁面
         with tab1:
-            username = st.text_input("帳號")
-            password = st.text_input("密碼", type="password")
+            username = st.text_input("帳號", key="login_username")
+            password = st.text_input("密碼", type="password", key="login_password")
             if st.button("登入"):
                 hashed_pwd = hashlib.sha256(password.encode()).hexdigest()
                 
-                # Debug: 顯示加密後的密碼
-                st.write("Debug: Hashed Password", hashed_pwd)
-                
-                # 使用 SQL 查詢
-                url = f"{SUPABASE_URL}/rest/v1/rpc/check_login"
-                headers = HEADERS.copy()
-                
-                # 構建 SQL 查詢
-                data = {
-                    "username_input": username,
-                    "password_input": hashed_pwd
-                }
-                
-                # Debug
-                st.write("Debug: Final URL", url)
-                st.write("Debug: Data", data)
-                
                 try:
+                    # 直接使用 httpx 發送請求
+                    url = f"{SUPABASE_URL}/rest/v1/users"
+                    headers = HEADERS.copy()
+                    
+                    # 構建查詢參數
+                    params = {
+                        "username": f"eq.{username}",
+                        "password": f"eq.{hashed_pwd}",
+                        "select": "username,role"
+                    }
+                    
+                    # Debug
+                    st.write("Debug: 查詢參數", params)
+                    
                     with httpx.Client() as client:
-                        # 先創建函數
-                        create_function_url = f"{SUPABASE_URL}/rest/v1/rpc/create_check_login"
-                        create_function_data = {
-                            "sql": """
-                            CREATE OR REPLACE FUNCTION check_login(username_input text, password_input text)
-                            RETURNS TABLE (username text, role text) AS $$
-                            BEGIN
-                                RETURN QUERY
-                                SELECT users.username, users.role
-                                FROM users
-                                WHERE users.username = username_input
-                                AND users.password = password_input;
-                            END;
-                            $$ LANGUAGE plpgsql;
-                            """
-                        }
-                        client.post(create_function_url, headers=headers, json=create_function_data)
+                        response = client.get(url, headers=headers, params=params)
                         
-                        # 執行查詢
-                        response = client.post(url, headers=headers, json=data)
+                        # Debug
+                        st.write("Debug: URL", response.url)
                         st.write("Debug: Response Status", response.status_code)
                         st.write("Debug: Response Text", response.text)
                         
