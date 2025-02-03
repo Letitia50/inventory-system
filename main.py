@@ -164,16 +164,11 @@ def main():
                 else:
                     hashed_pwd = hashlib.sha256(new_password.encode()).hexdigest()
                     
-                    # Debug: 顯示註冊資訊
-                    st.write("Debug: 註冊資訊", {
-                        "username": new_username,
-                        "password": hashed_pwd
-                    })
-                    
                     try:
                         # 直接使用 httpx 發送請求
                         url = f"{SUPABASE_URL}/rest/v1/users"
                         headers = HEADERS.copy()
+                        headers["Prefer"] = "return=representation"
                         
                         data = {
                             "username": new_username,
@@ -189,7 +184,7 @@ def main():
                             st.write("Debug: Response Headers", dict(response.headers))
                             st.write("Debug: Response Text", response.text)
                             
-                            if response.status_code == 201:  # Created
+                            if 200 <= response.status_code < 300:  # 成功狀態碼
                                 st.success("註冊成功！請返回登入頁面")
                             else:
                                 st.error(f"註冊失敗：HTTP {response.status_code}")
