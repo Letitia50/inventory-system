@@ -1,4 +1,6 @@
 streamlit
 pandas
 python-dotenv
-supabase-py
+supabase-py==1.0.3
+postgrest==0.10.8
+python-semantic-release==7.33.3
