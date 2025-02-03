@@ -3,6 +3,7 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 import hashlib
+import supabase
 
 # 設定頁面
 st.set_page_config(
@@ -134,14 +135,40 @@ def main():
         
         # 顯示庫存
         st.header("庫存列表")
-        conn = init_db()
-        df = pd.read_sql_query("SELECT * FROM inventory", conn)
-        conn.close()
-        
-        if not df.empty:
-            st.dataframe(df)
-        else:
-            st.info("目前沒有庫存記錄")
+        try:
+            # 讀取庫存
+            result = supabase.table('inventory').select("*").execute()
+            if result.data:
+                df = pd.DataFrame(result.data)
+                # 計算總金額
+                df['總金額'] = df['quantity'] * df['price']
+                
+                # 顯示完整庫存列表
+                st.subheader("完整庫存列表")
+                st.dataframe(df)
+                
+                # 顯示品項統計
+                st.subheader("品項統計")
+                summary = df.groupby('product_name').agg({
+                    'quantity': 'sum',
+                    'price': 'first',  # 顯示單價
+                    '總金額': 'sum'
+                }).reset_index()
+                summary.columns = ['商品名稱', '總數量', '單價', '總金額']
+                st.dataframe(summary)
+                
+                # 顯示總計
+                st.subheader("總計")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.info(f"所有商品總數量：{summary['總數量'].sum():,.0f}")
+                with col2:
+                    st.info(f"所有商品總金額：${summary['總金額'].sum():,.2f}")
+                
+            else:
+                st.info("目前沒有庫存記錄")
+        except Exception as e:
+            st.error(f"讀取失敗：{str(e)}")
 
 if __name__ == "__main__":
     main()
