@@ -98,20 +98,39 @@ def main():
                 # Debug: 顯示加密後的密碼
                 st.write("Debug: Hashed Password", hashed_pwd)
                 
-                # 修改查詢參數格式
-                query_params = {
+                # 直接使用 httpx 發送請求
+                url = f"{SUPABASE_URL}/rest/v1/users"
+                headers = HEADERS.copy()
+                headers["Range"] = "0-9"
+                
+                # 構建查詢參數
+                params = {
+                    "select": "*",
                     "username": f"eq.{username}",
                     "password": f"eq.{hashed_pwd}"
                 }
-                result = supabase_query('users', method="GET", query_params=query_params)
                 
-                if result:
-                    st.session_state.logged_in = True
-                    st.session_state.username = username
-                    st.success("登入成功！")
-                    st.rerun()
-                else:
-                    st.error("帳號或密碼錯誤")
+                # Debug
+                st.write("Debug: Final URL", url)
+                st.write("Debug: Params", params)
+                
+                try:
+                    with httpx.Client() as client:
+                        response = client.get(url, headers=headers, params=params)
+                        st.write("Debug: Response Status", response.status_code)
+                        st.write("Debug: Response Text", response.text)
+                        
+                        result = response.json() if response.text else []
+                        
+                        if result:
+                            st.session_state.logged_in = True
+                            st.session_state.username = username
+                            st.success("登入成功！")
+                            st.rerun()
+                        else:
+                            st.error("帳號或密碼錯誤")
+                except Exception as e:
+                    st.error(f"登入錯誤：{str(e)}")
         
         # 註冊頁面
         with tab2:
