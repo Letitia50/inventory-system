@@ -170,18 +170,33 @@ def main():
                 data = {
                     "product_name": product_name,
                     "quantity": quantity,
-                    "price": price,
+                    "price": float(price),  # 確保價格是浮點數
                     "last_updated": datetime.now().isoformat()
                 }
+                
+                # Debug 訊息
+                st.write("Debug: 新增商品資料", data)
+                
+                headers = HEADERS.copy()
+                headers["Prefer"] = "return=minimal"  # 加入 Prefer header
+                
+                # Debug 訊息
+                st.write("Debug: Headers", headers)
+                
                 response = httpx.post(
                     f"{SUPABASE_URL}/rest/v1/inventory",
-                    headers=HEADERS,
+                    headers=headers,
                     json=data
                 )
+                
+                # Debug 訊息
+                st.write("Debug: Response Status", response.status_code)
+                st.write("Debug: Response Text", response.text)
+                
                 if response.status_code == 201:
                     st.success("商品新增成功！")
                 else:
-                    st.error("新增失敗")
+                    st.error(f"新增失敗：HTTP {response.status_code}")
             except Exception as e:
                 st.error(f"新增失敗：{str(e)}")
         
