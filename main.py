@@ -23,9 +23,18 @@ HEADERS = {
 # Supabase API 函數
 def supabase_query(table, method="GET", data=None, query_params=None):
     url = f"{SUPABASE_URL}/rest/v1/{table}"
+    
+    # Debug: 顯示請求資訊
+    st.write("Debug: URL", url)
+    st.write("Debug: Headers", HEADERS)
+    st.write("Debug: Query Params", query_params)
+    
     with httpx.Client() as client:
         if method == "GET":
             response = client.get(url, headers=HEADERS, params=query_params)
+            # Debug: 顯示回應資訊
+            st.write("Debug: Response Status", response.status_code)
+            st.write("Debug: Response Text", response.text)
         elif method == "POST":
             response = client.post(url, headers=HEADERS, json=data)
         return response.json() if response.text else []
@@ -68,18 +77,17 @@ def main():
             if st.button("登入"):
                 hashed_pwd = hashlib.sha256(password.encode()).hexdigest()
                 
-                # 修改查詢方式
+                # Debug: 顯示加密後的密碼
+                st.write("Debug: Hashed Password", hashed_pwd)
+                
+                # 修改查詢參數格式
                 query_params = {
-                    "select": "*",
                     "username": f"eq.{username}",
                     "password": f"eq.{hashed_pwd}"
                 }
                 result = supabase_query('users', method="GET", query_params=query_params)
                 
-                # Debug 訊息
-                st.write("Debug: 登入查詢結果", result)
-                
-                if result:  # 修改判斷條件
+                if result:
                     st.session_state.logged_in = True
                     st.session_state.username = username
                     st.success("登入成功！")
@@ -103,7 +111,12 @@ def main():
                     hashed_pwd = hashlib.sha256(new_password.encode()).hexdigest()
                     try:
                         # 新增使用者
-                        supabase_query('users', method="POST", data={"username": new_username, "password": hashed_pwd, "role": "管理員"})
+                        data = {
+                            "username": new_username,
+                            "password": hashed_pwd,
+                            "role": "管理員"
+                        }
+                        supabase_query('users', method="POST", data=data)
                         st.success("註冊成功！請返回登入頁面")
                     except Exception as e:
                         st.error("此帳號已存在")
@@ -129,7 +142,13 @@ def main():
         if st.button("新增"):
             try:
                 # 新增商品
-                supabase_query('inventory', method="POST", data={"product_name": product_name, "quantity": quantity, "price": price, "last_updated": datetime.now().isoformat()})
+                data = {
+                    "product_name": product_name,
+                    "quantity": quantity,
+                    "price": price,
+                    "last_updated": datetime.now().isoformat()
+                }
+                supabase_query('inventory', method="POST", data=data)
                 st.success("商品新增成功！")
             except Exception as e:
                 st.error(f"新增失敗：{str(e)}")
@@ -139,9 +158,6 @@ def main():
         try:
             # 讀取庫存
             result = supabase_query('inventory', method="GET")
-            
-            # 加入測試訊息
-            st.write("Debug: 資料讀取結果", result)
             
             if result:
                 df = pd.DataFrame(result)
