@@ -77,51 +77,153 @@ st.markdown("""
 
 # 主程式
 def main():
-    st.title("登入測試")
+    st.title("🏪 店鋪庫存管理系統")
     
-    username = st.text_input("帳號")
-    password = st.text_input("密碼", type="password")
+    # 初始化 session state
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
     
-    if st.button("登入"):
-        hashed_pwd = hashlib.sha256(password.encode()).hexdigest()
+    # 登入/註冊介面
+    if not st.session_state.logged_in:
+        tab1, tab2 = st.tabs(["登入", "註冊"])
         
-        # Debug
-        st.write("Debug: 輸入資訊", {
-            "username": username,
-            "hashed_password": hashed_pwd
-        })
-        
-        try:
-            url = f"{SUPABASE_URL}/rest/v1/users"
-            params = {
-                "username": f"eq.{username}",
-                "password": f"eq.{hashed_pwd}"
-            }
-            
-            # Debug
-            st.write("Debug: 請求 URL", url)
-            st.write("Debug: 請求參數", params)
-            
-            with httpx.Client() as client:
-                response = client.get(url, headers=HEADERS, params=params)
+        # 登入頁面
+        with tab1:
+            username = st.text_input("帳號", key="login_username")
+            password = st.text_input("密碼", type="password", key="login_password")
+            if st.button("登入"):
+                hashed_pwd = hashlib.sha256(password.encode()).hexdigest()
                 
-                # Debug
-                st.write("Debug: 完整 URL", response.url)
-                st.write("Debug: 狀態碼", response.status_code)
-                st.write("Debug: 回應內容", response.text)
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    if result:
-                        st.success("登入成功！")
-                        st.write("用戶資料：", result)
-                    else:
-                        st.error("帳號或密碼錯誤")
-                else:
-                    st.error(f"API 錯誤：{response.status_code}")
+                try:
+                    url = f"{SUPABASE_URL}/rest/v1/users"
+                    params = {
+                        "username": f"eq.{username}",
+                        "password": f"eq.{hashed_pwd}"
+                    }
                     
+                    with httpx.Client() as client:
+                        response = client.get(url, headers=HEADERS, params=params)
+                        result = response.json() if response.text else []
+                        
+                        if result:
+                            st.session_state.logged_in = True
+                            st.session_state.username = username
+                            st.success("登入成功！")
+                            st.rerun()
+                        else:
+                            st.error("帳號或密碼錯誤")
+                except Exception as e:
+                    st.error(f"登入錯誤：{str(e)}")
+        
+        # 註冊頁面（保持不變）
+        with tab2:
+            new_username = st.text_input("新帳號")
+            new_password = st.text_input("新密碼", type="password")
+            confirm_password = st.text_input("確認密碼", type="password")
+            invitation_code = st.text_input("邀請碼")
+            
+            if st.button("註冊"):
+                if invitation_code != "love139674":
+                    st.error("邀請碼錯誤")
+                elif new_password != confirm_password:
+                    st.error("密碼不一致")
+                else:
+                    hashed_pwd = hashlib.sha256(new_password.encode()).hexdigest()
+                    try:
+                        data = {
+                            "username": new_username,
+                            "password": hashed_pwd,
+                            "role": "管理員"
+                        }
+                        response = httpx.post(
+                            f"{SUPABASE_URL}/rest/v1/users",
+                            headers=HEADERS,
+                            json=data
+                        )
+                        if response.status_code == 201:
+                            st.success("註冊成功！請返回登入頁面")
+                        else:
+                            st.error("註冊失敗")
+                    except Exception as e:
+                        st.error(f"註冊錯誤：{str(e)}")
+    
+    # 主要功能介面
+    else:
+        st.write(f"歡迎, {st.session_state.username}!")
+        
+        if st.button("登出"):
+            st.session_state.logged_in = False
+            st.rerun()
+        
+        # 新增商品
+        st.header("新增商品")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            product_name = st.text_input("商品名稱")
+        with col2:
+            quantity = st.number_input("數量", min_value=0)
+        with col3:
+            price = st.number_input("單價", min_value=0.0)
+        
+        if st.button("新增"):
+            try:
+                data = {
+                    "product_name": product_name,
+                    "quantity": quantity,
+                    "price": price,
+                    "last_updated": datetime.now().isoformat()
+                }
+                response = httpx.post(
+                    f"{SUPABASE_URL}/rest/v1/inventory",
+                    headers=HEADERS,
+                    json=data
+                )
+                if response.status_code == 201:
+                    st.success("商品新增成功！")
+                else:
+                    st.error("新增失敗")
+            except Exception as e:
+                st.error(f"新增失敗：{str(e)}")
+        
+        # 顯示庫存
+        st.header("庫存列表")
+        try:
+            response = httpx.get(
+                f"{SUPABASE_URL}/rest/v1/inventory",
+                headers=HEADERS
+            )
+            if response.status_code == 200:
+                result = response.json()
+                if result:
+                    df = pd.DataFrame(result)
+                    # 計算總金額
+                    df['總金額'] = df['quantity'] * df['price']
+                    
+                    # 顯示完整庫存列表
+                    st.subheader("完整庫存列表")
+                    st.dataframe(df)
+                    
+                    # 顯示品項統計
+                    st.subheader("品項統計")
+                    summary = df.groupby('product_name').agg({
+                        'quantity': 'sum',
+                        'price': 'first',
+                        '總金額': 'sum'
+                    }).reset_index()
+                    summary.columns = ['商品名稱', '總數量', '單價', '總金額']
+                    st.dataframe(summary)
+                    
+                    # 顯示總計
+                    st.subheader("總計")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.info(f"所有商品總數量：{summary['總數量'].sum():,.0f}")
+                    with col2:
+                        st.info(f"所有商品總金額：${summary['總金額'].sum():,.2f}")
+                else:
+                    st.info("目前沒有庫存記錄")
         except Exception as e:
-            st.error(f"錯誤：{str(e)}")
+            st.error(f"讀取失敗：{str(e)}")
 
 if __name__ == "__main__":
     main()
