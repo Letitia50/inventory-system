@@ -21,11 +21,11 @@ HEADERS = {
 }
 
 # Supabase API 函數
-def supabase_query(table, method="GET", data=None):
+def supabase_query(table, method="GET", data=None, query_params=None):
     url = f"{SUPABASE_URL}/rest/v1/{table}"
     with httpx.Client() as client:
         if method == "GET":
-            response = client.get(url, headers=HEADERS)
+            response = client.get(url, headers=HEADERS, params=query_params)
         elif method == "POST":
             response = client.post(url, headers=HEADERS, json=data)
         return response.json() if response.text else []
@@ -68,10 +68,18 @@ def main():
             if st.button("登入"):
                 hashed_pwd = hashlib.sha256(password.encode()).hexdigest()
                 
-                # 查詢使用者
-                result = supabase_query('users', method="GET", data={"username": username, "password": hashed_pwd})
+                # 修改查詢方式
+                query_params = {
+                    "select": "*",
+                    "username": f"eq.{username}",
+                    "password": f"eq.{hashed_pwd}"
+                }
+                result = supabase_query('users', method="GET", query_params=query_params)
                 
-                if result:
+                # Debug 訊息
+                st.write("Debug: 登入查詢結果", result)
+                
+                if result:  # 修改判斷條件
                     st.session_state.logged_in = True
                     st.session_state.username = username
                     st.success("登入成功！")
