@@ -163,17 +163,39 @@ def main():
                     st.error("密碼不一致")
                 else:
                     hashed_pwd = hashlib.sha256(new_password.encode()).hexdigest()
+                    
+                    # Debug: 顯示註冊資訊
+                    st.write("Debug: 註冊資訊", {
+                        "username": new_username,
+                        "password": hashed_pwd
+                    })
+                    
                     try:
-                        # 新增使用者
+                        # 直接使用 httpx 發送請求
+                        url = f"{SUPABASE_URL}/rest/v1/users"
+                        headers = HEADERS.copy()
+                        
                         data = {
                             "username": new_username,
                             "password": hashed_pwd,
                             "role": "管理員"
                         }
-                        supabase_query('users', method="POST", data=data)
-                        st.success("註冊成功！請返回登入頁面")
+                        
+                        with httpx.Client() as client:
+                            response = client.post(url, headers=headers, json=data)
+                            
+                            # Debug: 顯示回應資訊
+                            st.write("Debug: Response Status", response.status_code)
+                            st.write("Debug: Response Headers", dict(response.headers))
+                            st.write("Debug: Response Text", response.text)
+                            
+                            if response.status_code == 201:  # Created
+                                st.success("註冊成功！請返回登入頁面")
+                            else:
+                                st.error(f"註冊失敗：HTTP {response.status_code}")
+                                
                     except Exception as e:
-                        st.error("此帳號已存在")
+                        st.error(f"註冊錯誤：{str(e)}")
     
     # 主要功能介面
     else:
