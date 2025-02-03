@@ -123,15 +123,16 @@ def main():
             price = st.number_input("單價", min_value=0.0)
         
         if st.button("新增"):
-            conn = init_db()
-            c = conn.cursor()
-            c.execute("""
-            INSERT INTO inventory (product_name, quantity, price, last_updated)
-            VALUES (?, ?, ?, ?)
-            """, (product_name, quantity, price, datetime.now()))
-            conn.commit()
-            conn.close()
-            st.success("商品新增成功！")
+            try:
+                supabase.table('inventory').insert({
+                    "product_name": product_name,
+                    "quantity": quantity,
+                    "price": price,
+                    "last_updated": datetime.now().isoformat()
+                }).execute()
+                st.success("商品新增成功！")
+            except Exception as e:
+                st.error(f"新增失敗：{str(e)}")
         
         # 顯示庫存
         st.header("庫存列表")
@@ -164,7 +165,6 @@ def main():
                     st.info(f"所有商品總數量：{summary['總數量'].sum():,.0f}")
                 with col2:
                     st.info(f"所有商品總金額：${summary['總金額'].sum():,.2f}")
-                
             else:
                 st.info("目前沒有庫存記錄")
         except Exception as e:
