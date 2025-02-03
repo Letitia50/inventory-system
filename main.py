@@ -24,20 +24,38 @@ HEADERS = {
 def supabase_query(table, method="GET", data=None, query_params=None):
     url = f"{SUPABASE_URL}/rest/v1/{table}"
     
+    # 修改 headers，加入 Range
+    headers = HEADERS.copy()
+    headers["Range"] = "0-9"
+    
     # Debug: 顯示請求資訊
     st.write("Debug: URL", url)
-    st.write("Debug: Headers", HEADERS)
+    st.write("Debug: Headers", headers)
     st.write("Debug: Query Params", query_params)
     
-    with httpx.Client() as client:
-        if method == "GET":
-            response = client.get(url, headers=HEADERS, params=query_params)
-            # Debug: 顯示回應資訊
-            st.write("Debug: Response Status", response.status_code)
-            st.write("Debug: Response Text", response.text)
-        elif method == "POST":
-            response = client.post(url, headers=HEADERS, json=data)
-        return response.json() if response.text else []
+    try:
+        with httpx.Client() as client:
+            if method == "GET":
+                if query_params:
+                    # 構建查詢字串
+                    filters = []
+                    for key, value in query_params.items():
+                        filters.append(f"{key}={value}")
+                    query_string = "&".join(filters)
+                    url = f"{url}?{query_string}"
+                    st.write("Debug: Final URL", url)
+                
+                response = client.get(url, headers=headers)
+                # Debug: 顯示回應資訊
+                st.write("Debug: Response Status", response.status_code)
+                st.write("Debug: Response Text", response.text)
+            elif method == "POST":
+                response = client.post(url, headers=headers, json=data)
+            
+            return response.json() if response.text else []
+    except Exception as e:
+        st.error(f"API Error: {str(e)}")
+        return []
 
 # 設定頁面
 st.set_page_config(
