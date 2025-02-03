@@ -1,4 +1,4 @@
 streamlit
 pandas
-supabase-py
+supabase-py==2.3.4
 python-dotenv

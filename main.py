@@ -1,9 +1,10 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 from datetime import datetime
 import hashlib
-import supabase
+from supabase import create_client
+import os
+from dotenv import load_dotenv
 
 # 設定頁面
 st.set_page_config(
